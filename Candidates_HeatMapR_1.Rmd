@@ -82,19 +82,14 @@ The text of the debate are downloaded from the [UCSB Presidency Project](http://
     ## THIS CODE CHUNK GETS ALL THE CANDIDATE TEXT FROM FILES STORED LOCALLY
 
     ## create dummy file 
-    d_all <- NULL
+    d_all <- d.file[1] %>% load_debate_text
 
-    for (file_name in democratic.files){ 
-        ## load the text
-        d_temp <- file_name %>% load_debate_text
-        d_all <-  d_all %>% rbind(d_temp)
-    }
 
 ```
 
 ```{r, echo=TRUE, warning=FALSE}
     ##FILTER TEXT
-    word.filter <- "terror"
+    word.filter <- ""
 ```
 
 ```{r, echo=TRUE}
@@ -106,11 +101,9 @@ The text of the debate are downloaded from the [UCSB Presidency Project](http://
 ```{r, "get candidate text and create text corpora", echo=FALSE, warning=FALSE}
     
     ## Get Candidate Text
-    trump_text <- "TRUMP" %>% candidate_text(r_all, word.filter)
-    cruz_text <- "CRUZ" %>% candidate_text(r_all, word.filter)
-    rubio_text <- "RUBIO" %>% candidate_text(r_all, word.filter)
-    sanders_text <- "SANDERS" %>% candidate_text(d_all, word.filter)
-    clinton_text <- "CLINTON" %>% candidate_text(d_all, word.filter)
+    pence_text <- "TRUMP" %>% candidate_text(d_all, word.filter)
+    cruz_text <- "CRUZ" %>% candidate_text(d_all, word.filter)
+    moderator_text <- "QUIJANO" %>% candidate_text(r_all, word.filter)
     
     ## CREATE TCs FOR EACH CANDIDATE
     trump_all <- "TRUMP" %>% candidate_text_tc(r_all, word.filter)
