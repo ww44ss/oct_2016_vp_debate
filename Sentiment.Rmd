@@ -1,0 +1,283 @@
+---
+title: "Sentiment"
+author: "Winston Saunders"
+date: "May 9, 2016"
+output: 
+    html_document:
+        theme: united
+---
+<style>
+  .col2 {
+    columns: 2 300px;         /* number of columns and width in pixels */
+    -webkit-columns: 2 300px; /* chrome, safari */
+    -moz-columns: 2 300px;    /* firefox */
+  }
+  .col3 {
+    columns: 3 200px;
+    -webkit-columns: 3 200px;
+    -moz-columns: 3 200px;
+  }
+</style>
+
+<style>
+tr:hover {background-color: #BBFFFF}
+table { 
+    width: 80%;
+    display: table;
+    border-collapse: collapse;
+    border-spacing: 18px;
+    border-color: #AAAAFF;
+    background-color: #AFEEEE;
+    padding: 2px;
+    font: 12px arial, sans-serif;
+}
+th, td{
+    text-align: center;
+}
+</style>
+
+###SUMMARY
+ 
+This continuation of [BIAS AND CONTEXT IN PRESIDENTIAL DEBATE TEXTS](https://rpubs.com/ww44ss/Debate_Text) and [HEAT MAPS & LINGUISTICS OF DEBATE SPEECH in R](rpubs.com/ww44ss/HeatMapRDebates), which focused on a "Bag of Words" approach to analyzing the text of Presidential Debates for the 2016 Election Cycle.
+
+This extends the analysis to include "sentiment" analysis based on standard semiment models using the {virdis} package in R.
+
+###DATA SOURCES AND METHODS
+The text of the presidential debates are downloaded from the [UCSB Presidency Project](http://www.presidency.ucsb.edu/debates.php). Transcripts were pasted into Apple Pages and stored as unformatted .txt files.  
+
+
+
+
+```{r, "find debate files in directory", echo=FALSE, warning=FALSE, message=FALSE}
+
+    ## 
+    ## .txt file detection
+    
+
+    directory <- "/Users/winstonsaunders/Documents/presidential_debates_clinton_saunders/"
+    file.list <- list.files(directory)
+    
+    republican.files <- file.list[grepl("Republican", file.list)]
+    democratic.files <- file.list[grepl("Democratic", file.list)]
+    
+    
+    republican.file.names <- republican.files
+    democratic.file.names <- democratic.files
+    
+    
+    republican.files <- paste0(directory, republican.files)
+    democratic.files <- paste0(directory, democratic.files)
+
+```
+
+```{r, "load local functions", echo=FALSE}
+
+## LOAD LOCAL FUNCTIONS
+
+    ## load text of debate files
+    source(paste0(directory, "load_debate_text.R"))
+    ## select candidate text
+    source(paste0(directory, "candidate_text.R"))
+    ## turn candidate text in a Text Corpus
+    source(paste0(directory, "text_tc.R"))
+    ## selects candidate text and then turns that into a Text Corpus
+    source(paste0(directory, "candidate_text_tc.R"))
+    ## enable printing of multiple plots
+    source(paste0(directory, "multiplot.R"))
+    ## vector normialize
+    source(paste0(directory, "vector.normalize.R"))
+
+```
+
+```{r, "load r libraries", echo=FALSE, warning=FALSE, message=FALSE}
+
+    ## check for installed packages
+    if(! ("tm" %in% rownames(installed.packages())))      {install.packages("tm")}
+    if(! ("RWeka" %in% rownames(installed.packages())))   {install.packages("RWeka")}
+    if(! ("SnowballC" %in% rownames(installed.packages()))) {install.packages("SnowballC")}
+    if(! ("ggplot2" %in% rownames(installed.packages()))) {install.packages("ggplot2")}
+    if(! ("xtable" %in% rownames(installed.packages())))  {install.packages("xtable")}
+    if(! ("reshape2" %in% rownames(installed.packages())))  {install.packages("reshape2")}
+    if(! ("dplyr" %in% rownames(installed.packages())))  {install.packages("dplyr")}
+
+    library(dplyr)
+    library(tm)
+    library(RWeka)
+    library(SnowballC)
+    library(ggplot2)
+    library(xtable)
+    library(reshape2)
+    library(stringr)
+    if(! ("stringr" %in% rownames(installed.packages())))  {install.packages("stringr")}
+    if(! ("syuzhet" %in% rownames(installed.packages())))  {install.packages("syuzhet")}
+    if(! ("viridis" %in% rownames(installed.packages())))  {install.packages("viridis")}
+    library(stringr)
+    library(viridis)
+    library(syuzhet)
+
+    
+
+```
+
+```{r, "get text files", echo=FALSE, warning=FALSE, message=FALSE}
+
+
+    ## THIS CODE CHUNK GETS ALL THE CANDIDATE TEXT FROM FILES STORED LOCALLY
+
+    ## create dummy files for all republicans
+    r_all <- NULL
+    r.names.list <- c("QUINTANILLA", "KASICH", "HUCKABEE", "BUSH", "RUBIO", "TRUMP", "CARSON", "FIORINA", "CRUZ", "CHRISTIE", "PAUL", "HARWOOD", "QUICK", "CRAMER", "SANTELLI", "EPPERSON",                    "TAPPER", "DINAN","BASH","HEWITT", "CAVUTO", "BARTIROMO","BAKER","UNKNOWN","BLITZER","JOSH JACOB, COLLEGE STUDENT", "QUESTION" ,"AUDIENCE", "BAIER", "KELLY", "WALLACE","MUIR", "RADDATZ", "HAM" , "MCELVEEN", "DICKERSON", "STRASSEL", "GARRETT", "ARRARÁS", "CUOMO", "HANNITY", "UNIDENTIFIABLE"  )
+
+
+    for (file_name in republican.files){ 
+        ## load the text
+        temp <- file_name %>% load_debate_text
+        
+        ## extract date info from file name
+        date.regex <- "[A-z]+ [0-9]{1,2} [0-9]{4}"
+        date.text <- str_extract(file_name, date.regex)
+        
+        temp_tibl_df <- data_frame("debate" = date.text, "name" = temp$name, text = temp$text)
+        
+        
+        ## clean up and add index
+            temp_tibl_df <- temp_tibl_df[temp_tibl_df$name %in% r.names.list,]
+            temp_tibl_df$speaking_index <- seq.int(nrow(temp_tibl_df))
+        
+        r_all <-  r_all %>% rbind(temp_tibl_df)
+    }
+    
+    
+    #d.names.list <- c( "HOLT","CLINTON","SANDERS","MITCHELL", "FRANTA", "BROWNLEE", "DICKERSON", "CORDES", "COONEY", "WEBB", "BASH", "LEMON", "WILKINS", "LOPEZ", "RADDATZ", "LEVESQUE", "MCELVEEN" )
+    
+    
+    d.names.list <- c("COOPER", "CHAFEE","WEBB","OMALLEY","SANDERS", "CLINTON" ,"BASH", "LEMON", "WILKINS", "LOPEZ", "OMALLEY ", "QUESTION", "DICKERSON", "CORDES", "COONEY", "OBRADOVICH", "RADDATZ", "MUIR", "ANNOUNCER", "LEVESQUE", "MCELVEEN", "HOLT", "FRANCHESCA RAMSEY", "MITCHELL","FRANTA", "BROWNLEE", "TODD", "MADDOW", "WOODRUFF", "IFILL", "RAMOS", "SALINAS ", "RAMOS ", "SALINAS", "TUMULTY", "QUESTION ", "SMITH", "UNKNOWN ", "UNKNOWN", "BLITZER", "LOUIS", "AUDIENCE MEMBER") 
+    
+    
+    d_all<-NULL
+    
+    for (file_name in democratic.files){ 
+        ## load the text
+        temp <- file_name %>% load_debate_text
+        
+        ## extract date info from file name
+        date.regex <- "[A-z]+ [0-9]{1,2} [0-9]{4}"
+        date.text <- str_extract(file_name, date.regex)
+        
+        temp_tibl_df <- data_frame("debate" = date.text, "name" = temp$name, text = temp$text)
+        
+        
+        ## clean up and add index
+            temp_tibl_df <- temp_tibl_df[temp_tibl_df$name %in% d.names.list,]
+            temp_tibl_df$speaking_index <- seq.int(nrow(temp_tibl_df))
+        
+        d_all <-  d_all %>% rbind(temp_tibl_df)
+    }
+    
+    
+    
+    d_all_f <- as_data_frame(d_all)
+    d_all_f$concat_index <- seq.int(nrow(d_all_f))
+    
+    r_all_f <- as_data_frame(r_all)
+    r_all_f$concat_index <- seq.int(nrow(r_all_f))
+
+```
+
+```{r, "dummify commentators", echo=FALSE}
+
+
+d.candidates.list <- c("CHAFEE", "WEBB", "CLINTON", "SANDERS", "OMALLEY")
+
+r.candidates.list <- c("KASICH", "HUCKABEE", "BUSH", "RUBIO", "CARSON", "FIORINA", "CRUZ", "CHRISTIE", "PAUL", "TRUMP", "FIORINA")
+
+
+## keep just candidate names
+r_all_f <- r_all_f %>% mutate(candidate.name = ifelse(name %in% r.candidates.list, name, "OTHER") )
+## keep just candidate names
+d_all_f <- d_all_f %>% mutate(candidate.name = ifelse(name %in% d.candidates.list, name, "OTHER") )
+
+
+
+```
+
+####Democratic Debates
+
+```{r, ech0=FALSE}
+
+print(unique(d_all_f$debate))
+
+```
+
+
+#### Republican Debates
+
+```{r, ech0=FALSE}
+
+print(unique(r_all_f$debate))
+
+
+```
+
+###Compute Sentiment
+
+
+```{r}
+
+
+## add sentiment
+d_all_f <- mutate(d_all_f, sentiment = get_sentiment(d_all_f$text, method = "afinn"))
+
+r_all_f <- mutate(r_all_f, sentiment = get_sentiment(r_all_f$text, method = "afinn"))
+
+
+```
+
+
+```{r, fig.align="center", fig.width=9, fig.height=5, echo=FALSE}
+
+p <- ggplot(d_all_f, aes(x = concat_index, y = sentiment, fill=debate, color=debate)) + 
+    geom_bar(stat='identity') + 
+    facet_grid(candidate.name~.)
+    #geom_smooth(span = 0.3, n = 100)
+
+p 
+```
+
+```{r, fig.align="center", fig.width=9, fig.height=7, echo=FALSE}
+
+
+p <- ggplot(r_all_f, aes(x = concat_index, y = sentiment, fill=debate, color=debate)) + 
+    geom_bar(stat="identity") + 
+    facet_grid(candidate.name~.) 
+p 
+
+
+
+```
+
+
+
+
+
+```{r, fig.width=5, fig.height=8, echo=FALSE, fig.align='center'}
+
+trump_all <- r_all_f %>% filter(candidate.name=="TRUMP")
+
+p <- ggplot(trump_all, aes(x = speaking_index, y = sentiment)) + 
+    geom_bar(stat="identity", color = ) + 
+    facet_grid(debate~.) 
+p 
+
+
+```
+
+```{r, fig.width=5, fig.height=8, echo=FALSE, fig.align='center'}
+
+p <- ggplot(r_all_f[r_all_f$candidate.name == "CRUZ",], aes(x = speaking_index, y = sentiment)) + 
+    geom_bar(stat="identity", color = "salmon") + 
+    facet_grid(debate~.) 
+p 
+
+
+```

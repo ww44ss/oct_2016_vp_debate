@@ -1,0 +1,398 @@
+---
+title: "HEAT MAPS OF DEBATE SPEECH in R"
+author: "WW44SS"
+date: "April 5, 2016"
+output: 
+    html_document:
+        theme: united
+---
+
+<style>
+  .col2 {
+    columns: 2 300px;         /* number of columns and width in pixels */
+    -webkit-columns: 2 300px; /* chrome, safari */
+    -moz-columns: 2 300px;    /* firefox */
+  }
+  .col3 {
+    columns: 3 200px;
+    -webkit-columns: 3 200px;
+    -moz-columns: 3 200px;
+  }
+</style>
+
+<style>
+tr:hover {background-color: #BBFFFF}
+table { 
+    width: 80%;
+    display: table;
+    border-collapse: collapse;
+    border-spacing: 18px;
+    border-color: #AAAAFF;
+    background-color: #AFEEEE;
+    padding: 2px;
+    font: 12px arial, sans-serif;
+}
+th, td{
+    text-align: center;
+}
+</style>
+
+###SUMMARY
+ 
+This continuation of [BIAS AND CONTEXT IN PRESIDENTIAL DEBATE TEXTS](https://rpubs.com/ww44ss/Debate_Text), which focused on a "Bag of Words" approach to analyzing the text of Presidential Debates. 
+
+This analysis shows a "Heat Map" of frequent words. It is not really a new analysys, but just a better way of visualizing the data. I also 
+
+###DATA SOURCES AND METHODS
+The text of the presidential debates are downloaded from the [UCSB Presidency Project](http://www.presidency.ucsb.edu/debates.php). Transcripts were pasted into Apple Pages and stored as unformatted .txt files.  
+
+
+
+
+```{r, "find debate files in directory", echo=FALSE, warning=FALSE, message=FALSE}
+
+    ## 
+    ## .txt file detection
+    
+
+    directory <- "/Users/winstonsaunders/Documents/Presidential_Debates_2015/"
+    file.list <- list.files(directory)
+    
+    republican.files <- file.list[grepl("Republican", file.list)]
+    democratic.files <- file.list[grepl("Democratic", file.list)]
+
+
+```
+
+```{r, "load local functions", echo=FALSE}
+
+## LOAD LOCAL FUNCTIONS
+
+    ## load text of debate files
+    source(paste0(directory, "load_debate_text.R"))
+    ## select candidate text
+    source(paste0(directory, "candidate_text.R"))
+    ## turn candidate text in a Text Corpus
+    source(paste0(directory, "text_tc.R"))
+    ## selects candidate text and then turns that into a Text Corpus
+    source(paste0(directory, "candidate_text_tc.R"))
+    ## enable printing of multiple plots
+    source(paste0(directory, "multiplot.R"))
+    ## vector normialize
+    source(paste0(directory, "vector.normalize.R"))
+
+```
+
+```{r, "load r libraries", echo=FALSE, warning=FALSE, message=FALSE}
+
+    ## check for installed packages
+    if(! ("tm" %in% rownames(installed.packages())))      {install.packages("tm")}
+    if(! ("RWeka" %in% rownames(installed.packages())))   {install.packages("RWeka")}
+    if(! ("SnowballC" %in% rownames(installed.packages()))) {install.packages("SnowballC")}
+    if(! ("ggplot2" %in% rownames(installed.packages()))) {install.packages("ggplot2")}
+    if(! ("xtable" %in% rownames(installed.packages())))  {install.packages("xtable")}
+    if(! ("reshape2" %in% rownames(installed.packages())))  {install.packages("reshape2")}
+    if(! ("dplyr" %in% rownames(installed.packages())))  {install.packages("dplyr")}
+
+    library(tm)
+    library(RWeka)
+    library(SnowballC)
+    library(ggplot2)
+    library(xtable)
+    library(reshape2)
+    library(dplyr)
+```
+
+```{r, "get text files", echo=FALSE, warning=FALSE, message=FALSE}
+
+
+    ## THIS CODE CHUNK GETS ALL THE CANDIDATE TEXT FROM FILES STORED LOCALLY
+
+    ## create dummy files for all republicans
+    r_all <- NULL
+
+    for (file_name in republican.files){ 
+        ## load the text
+        r_temp <- file_name %>% load_debate_text
+        r_all <- r_all %>% rbind(r_temp)
+    }
+
+    ## create dummy file for all dems
+    d_all <- NULL
+
+    for (file_name in democratic.files){ 
+        ## load the text
+        d_temp <- file_name %>% load_debate_text
+        d_all <-  d_all %>% rbind(d_temp)
+    }
+
+```
+
+```{r, echo=TRUE, warning=FALSE}
+    ##FILTER TEXT
+    word.filter <- "terror"
+```
+
+```{r, echo=TRUE}
+## Start and Stop Word Frequency Rank
+    n.s <- 1    ## Start
+    n.w <- 20   ## Number of words
+```
+
+```{r, "get candidate text and create text corpora", echo=FALSE, warning=FALSE}
+    
+    ## Get Candidate Text
+    trump_text <- "TRUMP" %>% candidate_text(r_all, word.filter)
+    cruz_text <- "CRUZ" %>% candidate_text(r_all, word.filter)
+    rubio_text <- "RUBIO" %>% candidate_text(r_all, word.filter)
+    sanders_text <- "SANDERS" %>% candidate_text(d_all, word.filter)
+    clinton_text <- "CLINTON" %>% candidate_text(d_all, word.filter)
+    
+    ## CREATE TCs FOR EACH CANDIDATE
+    trump_all <- "TRUMP" %>% candidate_text_tc(r_all, word.filter)
+    rubio_all <- "RUBIO" %>% candidate_text_tc(r_all, word.filter)
+    fiorina_all <- "FIORINA" %>% candidate_text_tc(r_all, word.filter)
+    carson_all <- "CARSON" %>% candidate_text_tc(r_all, word.filter)
+    cruz_all <- "CRUZ" %>% candidate_text_tc(r_all, word.filter)
+    huckabee_all <- "HUCKABEE" %>% candidate_text_tc(r_all, word.filter)
+    bush_all <- "BUSH" %>% candidate_text_tc(r_all, word.filter)
+
+    clinton_all <- "CLINTON" %>% candidate_text_tc(d_all, word.filter)
+    sanders_all <- "SANDERS" %>% candidate_text_tc(d_all, word.filter)
+    
+```
+
+###CANDIDATE WORD FREQUENCIES
+
+We can check word frequency directly by tokenizing and counting single words. (Note: this is a partial duplication of the work done in the first analysis. But as the word vector analysis below leverages some of the output of this, it's reproduced here in a slightly different format as a control of quality)
+
+```{r, "create TDM", echo=FALSE}
+
+## Create Term_Document_Matrices
+
+TDM_trump <- trump_all %>% TermDocumentMatrix
+TDM_rubio <- rubio_all %>% TermDocumentMatrix
+TDM_fiorina <- fiorina_all %>% TermDocumentMatrix
+TDM_carson <- carson_all %>% TermDocumentMatrix
+TDM_cruz <- cruz_all %>% TermDocumentMatrix
+TDM_huckabee <- huckabee_all %>% TermDocumentMatrix
+TDM_bush <- bush_all %>% TermDocumentMatrix
+
+TDM_clinton <- clinton_all %>% TermDocumentMatrix
+TDM_sanders <- sanders_all %>% TermDocumentMatrix
+
+```
+
+```{r, "do word counts", echo=FALSE}
+
+## WORD COUNTS FOR CANDIDATES
+##  This code chunk takes a bunch of TDMs and converts them first to 
+##  the specific vocabulary of each candidate and them produces a table of words
+##
+## INPUT: 
+##      a TDM of candidate speech
+## OUTPUT
+##      merged_candidates: a data frame of words (rows), candidate names (columns) and word counts (data)
+##  
+
+## First convert TDMs to Data Frames
+
+    a <- as.matrix(TDM_trump)
+    b <- as.data.frame(a)
+    df_trump <- b
+    colnames(df_trump) <- "trump"
+    
+    words_trump <- sum(df_trump)
+    vocab_trump <- nrow(df_trump)
+    
+    a <- as.matrix(TDM_rubio)
+    b <- as.data.frame(a)
+    df_rubio <- b
+    colnames(df_rubio) <- "rubio"
+    
+    words_rubio <- sum(df_rubio)
+    vocab_rubio <- nrow(df_rubio)
+    
+    a <- as.matrix(TDM_sanders)
+    b <- as.data.frame(a)
+    df_sanders <- b
+    colnames(df_sanders) <- "sanders"
+    
+    words_sanders <- sum(df_sanders)
+    vocab_sanders <- nrow(df_sanders)
+    
+    a <- as.matrix(TDM_fiorina)
+    b <- as.data.frame(a)
+    df_fiorina <- b
+    colnames(df_fiorina) <- "fiorina"
+    
+    words_fiorina <- sum(df_fiorina)
+    vocab_fiorina <- nrow(df_fiorina)
+    
+    a <- as.matrix(TDM_clinton)
+    b <- as.data.frame(a)
+    df_clinton <- b
+    colnames(df_clinton) <- "clinton"
+    
+    words_clinton <- sum(df_clinton)
+    vocab_clinton <- nrow(df_clinton)
+    
+    a <- as.matrix(TDM_cruz)
+    b <- as.data.frame(a)
+    df_cruz <- b
+    colnames(df_cruz) <- "cruz"
+    
+    words_cruz <- sum(df_cruz)
+    vocab_cruz <- nrow(df_cruz)
+
+
+    #print(head(df_rubio))
+    
+## merge the data frames
+
+    ## merge trump and sanders
+    merged_candidates <- merge(df_trump, df_sanders, by="row.names", all=TRUE)
+    ## assign rownames
+    rownames(merged_candidates) <- merged_candidates$Row.names
+    ## clear $Row.names
+    merged_candidates$Row.names <- NULL
+    ## merge clinton
+    merged_candidates <- merge(merged_candidates, df_clinton, by="row.names", all=TRUE)
+    rownames(merged_candidates) <- merged_candidates$Row.names
+    merged_candidates$Row.names <- NULL
+    ## merge rubio
+    merged_candidates <- merge(merged_candidates, df_rubio, by="row.names", all=TRUE)
+    rownames(merged_candidates) <- merged_candidates$Row.names
+    merged_candidates$Row.names <- NULL
+    ##merge cruz
+    merged_candidates <- merge(merged_candidates, df_cruz, by="row.names", all=TRUE)
+    rownames(merged_candidates) <- merged_candidates$Row.names
+
+    
+
+    ## fix NAs
+    merged_candidates[is.na(merged_candidates)] <- 0
+
+    ## make $Row.names a factor
+    merged_candidates$Row.names <- as.factor(merged_candidates$Row.names)
+
+    ## merged_candidates is now computed
+    
+    ## COMPUTE WORD SUMS
+    
+    ## sum all
+    merged_candidates$all <- merged_candidates$trump + merged_candidates$sanders + merged_candidates$clinton + merged_candidates$rubio + merged_candidates$cruz
+
+    ## sort it
+    merged_candidates <- merged_candidates[with(merged_candidates, order(-all)), ]
+
+    #merged_candidates <- merged_candidates[merged_candidates$all>50,]
+    ## convert Row.names to a factor
+    merged_candidates$Row.names <- as.factor(merged_candidates$Row.names)
+    
+    merged_candidates <- merged_candidates[complete.cases(merged_candidates),]
+    
+    
+    ## This is an exaple of what the data look like (in Jan 2016)
+    #         Row.names trump sanders clinton rubio cruz all
+    # people     people   105     162     117    86   24 494
+    # going       going    84      84      90    56   13 327
+    # think       think    31     110     150    10   13 314
+    # country   country    64     119      56    52   10 301
+    # know         know    47      55     113    37   41 293
+    # will         will    43      48      70    45   55 261
+
+```
+
+There are a total of `r dim(merged_candidates)[1]` words in the combined vocabulary of the candidates.  
+
+```{r, "top words table", echo=FALSE, results="asis"}
+
+    ## create lists sorted by decreasing order of each candidate
+    c_1 <- merged_candidates[with(merged_candidates, order(-clinton)), ]
+    s_1 <- merged_candidates[with(merged_candidates, order(-sanders)), ]
+    tc_1 <- merged_candidates[with(merged_candidates, order(-cruz)), ]
+    t_1 <- merged_candidates[with(merged_candidates, order(-trump)), ]
+    r_1 <- merged_candidates[with(merged_candidates, order(-rubio)), ]
+
+    ## take the top 5 of each
+    
+    n.list <- 5
+    
+    compare_mf <- merge( merge( merge( merge(c_1[1:n.list,], tc_1[1:n.list,], all=TRUE), s_1[1:n.list,], all=TRUE), t_1[1:n.list,], all=TRUE), r_1[1:n.list,], all=TRUE)
+    colnames(compare_mf) <- c("word", "trump", "sanders", "clinton", "rubio","cruz", "all")
+    
+    compare_mf <- compare_mf[with(compare_mf, order(-all)),]
+    
+    ## compute column sums for each candidate
+    trump_sum <- sum(merged_candidates[,"trump"])
+    sanders_sum <- sum(merged_candidates[,"sanders"])
+    clinton_sum <- sum(merged_candidates[,"clinton"])
+    cruz_sum <- sum(merged_candidates[,"cruz"])
+    rubio_sum <- sum(merged_candidates[,"rubio"])
+    sum_all <- sum(merged_candidates[,"all"])
+    sum_row <- c("SUM", trump_sum, sanders_sum, clinton_sum, cruz_sum, rubio_sum, sum_all)
+    
+    #bind rows
+    compare_mf$word <- as.character(compare_mf$word)
+    compare_mf <- rbind(compare_mf, sum_row)
+    
+    print(xtable(unique(compare_mf), digits=0), type='html', comment=FALSE, include.rownames=FALSE, 
+         html.table.attributes='border="3" align="center" ' )
+
+```
+
+__- Hillary Clinton__ spoke `r words_clinton` total words, with a vocabulary of `r vocab_clinton` words.   
+__- Bernie Sanders__ spoke `r words_sanders` total words, with a vocabulary of `r vocab_sanders` words.   
+__- Donald Trump__ spoke `r words_trump` words with a vocabulary of `r vocab_trump` words.  
+__- Ted Cruz__ spoke `r words_cruz` words with a vocabulary of `r vocab_cruz` words.  
+__- Marco Rubio__ spoke `r words_rubio` words with a vocabulary of `r vocab_rubio` words.   
+
+A "heat map" of frequent words shows several interesting patterns. For instance, all candidates but one use the word _"people"_ with high frequency. Conversely, only one candidate mentions the word _"tax"_ frequently.
+
+```{r, "create heat map", echo=FALSE, fig.align="center", fig.height=3, fig.width=9, message=FALSE, warning=FALSE}
+
+    ## this creates a heat map of the same data above
+    
+    ## INPUT:
+    ##      merged_dandidates from above
+    ## OUTPUT: 
+    ##      a plot
+    
+    merged_candidates_p <- merged_candidates[1:min(75, nrow(merged_candidates)), ]
+    
+    ## compute column sums for each candidate
+    merged_candidates_p[,"trump"] <- merged_candidates_p[,"trump"]/sum(merged_candidates[,"trump"])
+    merged_candidates_p[,"sanders"] <- merged_candidates_p[,"sanders"]/sum(merged_candidates[,"sanders"])
+    merged_candidates_p[,"clinton"] <- merged_candidates_p[,"clinton"]/sum(merged_candidates[,"clinton"])
+    merged_candidates_p[,"cruz"] <- merged_candidates_p[,"cruz"]/sum(merged_candidates[,"cruz"])
+    merged_candidates_p[,"rubio"] <- merged_candidates_p[,"rubio"]/sum(merged_candidates[,"rubio"])
+    merged_candidates_p[,"all"] <- merged_candidates_p[,"all"]/sum(merged_candidates[,"all"])
+
+## use dplyr
+
+    mcp_m <- melt(merged_candidates_p)
+    colnames(mcp_m) <- c("word", "candidate", "frequency")
+    
+
+    
+    p <- ggplot(mcp_m, aes(as.factor(word),candidate))
+    p <-  p + geom_tile(aes(fill=frequency), color="white")
+    p <-  p + scale_fill_gradient2(low = "white", mid = "dodgerblue3", high = "red", midpoint = max(mcp_m$frequency)/2, na.value="grey50")
+    p <- p + ggtitle("candidate/word heatmap")
+    p <- p + xlab("word")
+    p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+    p <- p + ylab("candidate")
+    
+    p
+```
+ 
+
+
+
+
+####CONCLUSIONS
+
+Candidate word choices vary from candidate to candidate. Filtering for specific text choices and word counts reveals interesting and potentially explitable patterns.
+
+
