@@ -1,52 +1,25 @@
 ---
-title: "HEAT MAPS OF DEBATE SPEECH in R"
+title: "HEAT MAPS OF OCT 2016 VP DEBATE SPEECH"
 author: "WW44SS"
-date: "April 5, 2016"
+date: "Oct 6, 2016"
 output: 
     html_document:
-        theme: united
+        css: markdown7.css
+        toc: true
+        toc_depth: 1
+        keep_md: true
 ---
 
-<style>
-  .col2 {
-    columns: 2 300px;         /* number of columns and width in pixels */
-    -webkit-columns: 2 300px; /* chrome, safari */
-    -moz-columns: 2 300px;    /* firefox */
-  }
-  .col3 {
-    columns: 3 200px;
-    -webkit-columns: 3 200px;
-    -moz-columns: 3 200px;
-  }
-</style>
 
-<style>
-tr:hover {background-color: #BBFFFF}
-table { 
-    width: 80%;
-    display: table;
-    border-collapse: collapse;
-    border-spacing: 18px;
-    border-color: #AAAAFF;
-    background-color: #AFEEEE;
-    padding: 2px;
-    font: 12px arial, sans-serif;
-}
-th, td{
-    text-align: center;
-}
-</style>
 
 ###SUMMARY
  
 This continuation of [BIAS AND CONTEXT IN PRESIDENTIAL DEBATE TEXTS](https://rpubs.com/ww44ss/Debate_Text), which focused on a "Bag of Words" approach to analyzing the text of Presidential Debates. 
 
-This analysis shows a "Heat Map" of frequent words. It is not really a new analysys, but just a better way of visualizing the data. I also 
+This analysis shows a "Heat Map" of frequent words. It is not really a new analysis, but just a better way of visualizing the data.  
 
 ###DATA SOURCES AND METHODS
-The text of the presidential debates are downloaded from the [UCSB Presidency Project](http://www.presidency.ucsb.edu/debates.php). Transcripts were pasted into Apple Pages and stored as unformatted .txt files.  
-
-
+The text of the debate are downloaded from the [UCSB Presidency Project](http://www.presidency.ucsb.edu/debates.php). Transcripts were pasted into Apple Pages and stored as unformatted .txt files.  
 
 
 ```{r, "find debate files in directory", echo=FALSE, warning=FALSE, message=FALSE}
@@ -55,11 +28,11 @@ The text of the presidential debates are downloaded from the [UCSB Presidency Pr
     ## .txt file detection
     
 
-    directory <- "/Users/winstonsaunders/Documents/Presidential_Debates_2015/"
+    directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
     file.list <- list.files(directory)
     
-    republican.files <- file.list[grepl("Republican", file.list)]
-    democratic.files <- file.list[grepl("Democratic", file.list)]
+    d.file <- file.list[grepl("_debate_", file.list)]
+    
 
 
 ```
@@ -108,16 +81,7 @@ The text of the presidential debates are downloaded from the [UCSB Presidency Pr
 
     ## THIS CODE CHUNK GETS ALL THE CANDIDATE TEXT FROM FILES STORED LOCALLY
 
-    ## create dummy files for all republicans
-    r_all <- NULL
-
-    for (file_name in republican.files){ 
-        ## load the text
-        r_temp <- file_name %>% load_debate_text
-        r_all <- r_all %>% rbind(r_temp)
-    }
-
-    ## create dummy file for all dems
+    ## create dummy file 
     d_all <- NULL
 
     for (file_name in democratic.files){ 
