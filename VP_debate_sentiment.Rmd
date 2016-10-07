@@ -1,0 +1,115 @@
+---
+title: "SENTIMENT OF OCT 2016 VP DEBATE SPEECH"
+author: "WW44SS"
+date: "Oct 6, 2016"
+output: 
+    html_document:
+        css: markdown7.css
+        toc: true
+        toc_depth: 1
+        keep_md: true
+---
+
+
+###SUMMARY
+ 
+This continuation of [BIAS AND CONTEXT IN PRESIDENTIAL DEBATE TEXTS](https://rpubs.com/ww44ss/Debate_Text), which focused on a "Bag of Words" approach to analyzing the text of Presidential Debates. 
+
+This analysis shows a "Heat Map" of frequent words. It is not really a new analysis, but just a better way of visualizing the data.  
+
+###DATA SOURCES AND METHODS
+The text of the debate are downloaded from the [UCSB Presidency Project](http://www.presidency.ucsb.edu/debates.php). Transcripts were pasted into Apple Pages and stored as unformatted .txt files.  
+
+
+
+
+
+
+```{r, "load local functions", echo=FALSE}
+
+idem <-function(x){x}
+
+## LOAD LOCAL FUNCTIONS
+    directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
+    ## load text of debate files
+    source(paste0(directory, "load_debate_text.R"))
+    ## select candidate text
+    source(paste0(directory, "candidate_text.R"))
+    ## turn candidate text in a Text Corpus
+    source(paste0(directory, "text_tc.R"))
+    ## selects candidate text and then turns that into a Text Corpus
+    source(paste0(directory, "candidate_text_tc.R"))
+    ## enable printing of multiple plots
+    source(paste0(directory, "multiplot.R"))
+    ## vector normialize
+    source(paste0(directory, "vector.normalize.R"))
+
+```
+
+```{r, "load r libraries", echo=FALSE, warning=FALSE, message=FALSE}
+
+     ## check for installed packages
+    if(! ("tm" %in% rownames(installed.packages())))      {install.packages("tm")}
+    if(! ("RWeka" %in% rownames(installed.packages())))   {install.packages("RWeka")}
+    if(! ("SnowballC" %in% rownames(installed.packages()))) {install.packages("SnowballC")}
+    if(! ("ggplot2" %in% rownames(installed.packages()))) {install.packages("ggplot2")}
+    if(! ("xtable" %in% rownames(installed.packages())))  {install.packages("xtable")}
+    if(! ("reshape2" %in% rownames(installed.packages())))  {install.packages("reshape2")}
+    if(! ("dplyr" %in% rownames(installed.packages())))  {install.packages("dplyr")}
+
+    library(dplyr)
+    library(animation)
+    library(tm)
+    library(RWeka)
+    library(SnowballC)
+    library(ggplot2)
+    library(xtable)
+    library(reshape2)
+    library(stringr)
+    if(! ("stringr" %in% rownames(installed.packages())))  {install.packages("stringr")}
+    if(! ("syuzhet" %in% rownames(installed.packages())))  {install.packages("syuzhet")}
+    if(! ("viridis" %in% rownames(installed.packages())))  {install.packages("viridis")}
+    library(stringr)
+    library(viridis)
+    library(syuzhet)
+```
+
+```{r, "find debate files in directory", echo=FALSE, warning=FALSE, message=FALSE}
+
+    ## 
+    ## .txt file detection
+    
+
+    directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
+    file.list <- list.files(directory)
+    
+    cleaned.file <- file.list[grepl("_cleaned", file.list)]
+    
+    debate_all <- read.csv(paste0(directory, cleaned.file), stringsAsFactors = FALSE) %>% as_data_frame
+  
+
+
+    debate_all_sentiment <- debate_all %>% 
+        mutate(sentiment = get_sentiment(debate_all$text, method = "afinn")) %>% group_by(name)
+
+    i = 300
+    ggplot(debate_all_sentiment %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+        geom_bar(stat = 'identity', alpha = 0.5) + 
+        geom_smooth(se=FALSE, n=500, span = .1, size = 0.4) + 
+        facet_grid(.~name) + theme_bw() + 
+        xlim(range(debate_all_sentiment$X)) + 
+        ylim(range(debate_all_sentiment$sentiment)) 
+    
+    
+    saveGIF
+    for (i in unique(debate_all_sentiment$X)) {
+        print( ggplot(debate_all_sentiment %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) + 
+            geom_bar(stat = 'identity', alpha = 0.5) + 
+            geom_smooth(se=FALSE, n=500, span = .1, size = 0.4) + 
+            facet_grid(.~name) + theme_bw() + 
+            xlim(range(debate_all_sentiment$X)) + 
+            ylim(range(debate_all_sentiment$sentiment))) 
+    }
+    }, interval = 0.2, movie.name = "ggplot2-brownian-motion.gif", ani.width = 800, ani.height = 400)
+
+```

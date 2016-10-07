@@ -9,7 +9,7 @@
     ## OUTPUT:
     ##      returns a tibble data frame with name and cleaned text, in order. 
     
-
+    directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
     raw_data <- read.table(paste0(directory, file_name), header=FALSE, sep="\n", stringsAsFactors = FALSE, quote = "")
     
     ## convert to tibble
