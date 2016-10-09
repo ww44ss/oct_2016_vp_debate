@@ -1,6 +1,8 @@
 
 ## DEBATE DATA CLEANER. 
 
+    ## Rev 0.1 ensured applause, interrupt etc are moved.
+
     ## A utility program to produce cleaned data from the raw data stored on this site. 
     ## Read a text file. Filters and conditions the text. Creates a data frame with the row number, candidate name, and text.
     ## INPUT:
@@ -9,6 +11,7 @@
     ## OUTPUT:
     ##      returns a tibble data frame with name and cleaned text, in order. 
     
+    file_name <- "VP_debate_Oct_2016.txt"
     directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
     raw_data <- read.table(paste0(directory, file_name), header=FALSE, sep="\n", stringsAsFactors = FALSE, quote = "")
     
@@ -41,10 +44,11 @@
     
    
     cleaner_data <- cleaner_data %>%
-        mutate(clean_text = gsub ("[[:punct:]]", "", clean_text)) %>%
-        mutate(clean_text = gsub ("[0-9]", "",  clean_text)) %>%
+        mutate(clean_text = gsub ("interrupt", "", clean_text)) %>%
         mutate(clean_text = gsub ("\\[applause\\]", "",  clean_text))%>%
         mutate(clean_text = gsub ("\\[crosstalk\\]", "",  clean_text)) %>%
+        mutate(clean_text = gsub ("[[:punct:]]", "", clean_text)) %>%
+        mutate(clean_text = gsub ("[0-9]", "",  clean_text)) %>%
         mutate(clean_text = gsub ("[A-Z]{2,} ", "",  clean_text))
     
     cleaner_data <- cleaner_data %>%
