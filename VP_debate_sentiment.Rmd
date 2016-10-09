@@ -72,6 +72,7 @@ idem <-function(x){x}
     library(stringr)
     library(viridis)
     library(syuzhet)
+    library(tidytext)
 ```
 
 ```{r, "find debate files in directory", echo=FALSE, warning=FALSE, message=FALSE}
@@ -89,27 +90,75 @@ idem <-function(x){x}
   
 
 
-    debate_all_sentiment <- debate_all %>% 
-        mutate(sentiment = get_sentiment(debate_all$text, method = "afinn")) %>% group_by(name)
+    debate_all_s <- debate_all %>% 
+        mutate(text_sentiment = get_sentiment(debate_all$text, method = "afinn"))
+    
+    debate_words  <- debate_all %>%
+        select(X, name, text) %>%
+        unnest_tokens(word, text) %>%
+        filter(!word %in% stop_words$word) %>% 
+        #mutate(word_sentiment = get_sentiment(debate_words$word, method = "afinn")) %>%
+        idem
 
-    i = 300
-    ggplot(debate_all_sentiment %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
-        geom_bar(stat = 'identity', alpha = 0.5) + 
-        geom_smooth(se=FALSE, n=500, span = .1, size = 0.4) + 
-        facet_grid(.~name) + theme_bw() + 
-        xlim(range(debate_all_sentiment$X)) + 
-        ylim(range(debate_all_sentiment$sentiment)) 
+    word_sentiment_dict <- sentiments %>%
+        filter(lexicon == "AFINN") %>%
+        select(word, sentiment = score) %>%
+        idem
+    
+    sentiment_df <- debate_words %>%
+        left_join(word_sentiment_dict, by = "word") %>%
+        mutate(sent2 = ifelse(is.na(sentiment), 0, sentiment)) %>%
+        group_by(X, name) %>%
+        summarize(mean_sent = mean(sent2), sum_sent = sum(sent2), abs_sum_sent = sum(abs(sent2))) %>%
+        idem
+
+    
+    sentiment_plot <- data_frame("X" = as.integer(1), "name" = "junk", "sentiment" = 1., "fit" = 1.)[-1,]
+    
+    name.x <- unique(sentiment_df$name)[2]    
+    
+        for (name.x in unique(sentiment_df$name)) {
+            fitted_sent <- sentiment_df %>%
+                filter(name == name.x) %>%
+                idem
+                
+            l.fit <- loess(mean_sent~ X, fitted_sent, span = .15)
+            l.predict <- predict(l.fit, fitted_sent$X)
+            
+            #plot(l.predict)
+            
+            fitted_sent <- fitted_sent %>%
+                select(X, name, mean_sent) %>%
+                bind_cols(as_data_frame(l.predict)) %>%
+                idem
+            
+            colnames(fitted_sent) <- colnames(sentiment_plot)
+            
+            sentiment_plot <- bind_rows(sentiment_plot, fitted_sent)
+        }
+            
+        sentiment_plot <- sentiment_plot[order(sentiment_plot$X),]
+
+        
+    i = 400
+    ggplot(sentiment_plot %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+        geom_bar(stat = 'identity', alpha = 1.) + 
+        geom_line(aes(x=X, y = 7*fit), color = "blue", size = .4) + 
+        facet_grid(name~.) + theme_bw() + 
+        xlim(range(sentiment_plot$X)) + 
+        ylim(range(sentiment_plot$sentiment)) 
     
     
-    saveGIF
-    for (i in unique(debate_all_sentiment$X)) {
-        print( ggplot(debate_all_sentiment %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) + 
-            geom_bar(stat = 'identity', alpha = 0.5) + 
-            geom_smooth(se=FALSE, n=500, span = .1, size = 0.4) + 
-            facet_grid(.~name) + theme_bw() + 
-            xlim(range(debate_all_sentiment$X)) + 
-            ylim(range(debate_all_sentiment$sentiment))) 
+    
+    saveGIF({
+    for (i in 1:nrow(sentiment_plot)) {
+        print( ggplot(sentiment_plot %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+        geom_bar(stat = 'identity', alpha = 1.) + 
+        geom_line(aes(x=X, y = 7*fit), color = "blue", size = .4) + 
+        facet_grid(name~.) + theme_bw() + 
+        xlim(range(sentiment_plot$X)) + 
+        ylim(range(sentiment_plot$sentiment)) ) 
     }
-    }, interval = 0.2, movie.name = "ggplot2-brownian-motion.gif", ani.width = 800, ani.height = 400)
+    }, interval = 0.1, movie.name = "sentiment_animation.gif", ani.width = 800, ani.height = 400)
 
 ```
