@@ -31,47 +31,14 @@ idem <-function(x){x}
 
 ## LOAD LOCAL FUNCTIONS
     directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
-    ## load text of debate files
-    source(paste0(directory, "load_debate_text.R"))
-    ## select candidate text
-    source(paste0(directory, "candidate_text.R"))
-    ## turn candidate text in a Text Corpus
-    source(paste0(directory, "text_tc.R"))
-    ## selects candidate text and then turns that into a Text Corpus
-    source(paste0(directory, "candidate_text_tc.R"))
-    ## enable printing of multiple plots
-    source(paste0(directory, "multiplot.R"))
-    ## vector normialize
-    source(paste0(directory, "vector.normalize.R"))
-
+    
 ```
 
 ```{r, "load r libraries", echo=FALSE, warning=FALSE, message=FALSE}
 
-     ## check for installed packages
-    if(! ("tm" %in% rownames(installed.packages())))      {install.packages("tm")}
-    if(! ("RWeka" %in% rownames(installed.packages())))   {install.packages("RWeka")}
-    if(! ("SnowballC" %in% rownames(installed.packages()))) {install.packages("SnowballC")}
-    if(! ("ggplot2" %in% rownames(installed.packages()))) {install.packages("ggplot2")}
-    if(! ("xtable" %in% rownames(installed.packages())))  {install.packages("xtable")}
-    if(! ("reshape2" %in% rownames(installed.packages())))  {install.packages("reshape2")}
-    if(! ("dplyr" %in% rownames(installed.packages())))  {install.packages("dplyr")}
-
     library(dplyr)
     library(animation)
-    library(tm)
-    library(RWeka)
-    library(SnowballC)
     library(ggplot2)
-    library(xtable)
-    library(reshape2)
-    library(stringr)
-    if(! ("stringr" %in% rownames(installed.packages())))  {install.packages("stringr")}
-    if(! ("syuzhet" %in% rownames(installed.packages())))  {install.packages("syuzhet")}
-    if(! ("viridis" %in% rownames(installed.packages())))  {install.packages("viridis")}
-    library(stringr)
-    library(viridis)
-    library(syuzhet)
     library(tidytext)
 ```
 
@@ -84,14 +51,16 @@ idem <-function(x){x}
     directory <- "/Users/winstonsaunders/Documents/oct_2016_vp_debate/"
     file.list <- list.files(directory)
     
-    cleaned.file <- file.list[grepl("_cleaned", file.list)]
+    ## search for and read lightly cleaned debate text .csv
+    data.file <- file.list[grepl("_cleaned", file.list)]
     
-    cleaned_debate_text <- read.csv(paste0(directory, cleaned.file), stringsAsFactors = FALSE) %>% as_data_frame
+    debate_text <- read.csv(paste0(directory, data.file), stringsAsFactors = FALSE) %>% as_data_frame
   
 
     ## create tidy df of debate words
-    debate_words <- cleaned_debate_text %>%
-        unnest_tokens(word, text) %>%
+    ## add netural non-"stop" word to each
+    debate_words <- debate_text %>%
+        unnest_tokens(word, paste(text, "people")) %>%
         filter(!word %in% stop_words$word) %>% 
         idem
 
@@ -110,42 +79,65 @@ idem <-function(x){x}
     ## compute sentiment of debate responses by regrouping and compute means and cumsums
     sentiment_df <- word_sentiment_df %>%
         group_by(X, name) %>%
-        summarize(sentiment = mean(sentiment)) %>%
+        summarize(sentiment = sum(sentiment)) %>%
         group_by(name) %>%
         mutate(cumm_sent = cumsum(sentiment)) %>%
-        #ungroup %>%
         idem
+    
+    ## create data_frame for plotting. Since some X have no entry, need to fix those
+    plot_df <- sentiment_df %>% left_join(debate_text, by = "X") %>%
+        #select(X, "name" = name.x, sentiment, cumm_sent, text) %>%
+        #mutate(sentiment = ifelse(is.na(sentiment), 0, sentiment)) %>%
+        #mutate(cumm_sent_lag = lag(cumm_sent,1)) %>%
+        #group_by(name) %>%
+       # mutate(cumm_sent = ifelse(is.na(cumm_sent), cumm_sent_lag, cumm_sent)) %>%
+       # mutate(cumm_sent = ifelse(is.na(cumm_sent), cumm_sent_lag, cumm_sent)) %>% 
+       # mutate(cumm_sent = ifelse(is.na(cumm_sent), cumm_sent_lag, cumm_sent)) %>% 
+       # mutate(cumm_sent = ifelse(is.na(cumm_sent), cumm_sent_lag, cumm_sent)) %>%  ## just in case
+        #ungroup %>%
+        #select(X, name, sentiment, cumm_sent, text) %>%
+        idem
+    
+    
+    
 
     ## go back and add words for strong sentiment
     
-    gif_steps <- c(sentiment_df$X[abs(sentiment_df$sentiment) > .6 ], sentiment_df$X[nrow(sentiment_df)])
+    gif_steps <- c(plot_df$X[abs(plot_df$sentiment) > 5 ], plot_df$X[nrow(plot_df)])
 
 
     saveGIF({
     for (i in gif_steps) {
         print( 
-            ggplot(sentiment_df %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
-                geom_bar(stat = 'identity', alpha = 1.) + 
-                geom_line(aes(x=X, y = 2*cumm_sent/max(abs(cumm_sent)), color = name), size = 1) + 
-                facet_grid(name~.) + theme_bw() +
-                xlim(range(sentiment_plot$X)) + 
-                ylim(range(sentiment_plot$sentiment)) +
-                ggtitle(paste0(sentiment_df$name[i], ": ",
-                      #paste(word_sentiment_df$word[word_sentiment_df$X == i], sep = "", collapse = " "))
-                grep("^([a-z]* )+", substr(cleaned_debate_text$text[i], 1, 40), value=TRUE) ) )
-        )  
+            ggplot(plot_df %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+                geom_bar(stat = 'identity', alpha = 1.) +
+                geom_line(aes(x=X, y = cumm_sent/max(abs(plot_df$cumm_sent), group = name), color = name), size = 1) +
+                xlim(range(plot_df$X)) +
+                ylim(range(plot_df$sentiment)) +
+                ggtitle(paste0(plot_df$name[i], ": ", gsub("[a-z]+$", "", substr(plot_df$text[i], 1, 80)) ) ) +
+                facet_grid(name~.) +
+                theme_bw()
+        ) 
+        
           
     }
     }, interval = .5, movie.name = paste0(directory,"sentiment_animation.gif"), ani.width = 800, ani.height = 400)
     
-    i <- gif_steps[5]
-    ggplot(sentiment_df %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
-        geom_bar(stat = 'identity', alpha = 1.) + 
-        geom_line(aes(x=X, y = 2*cumm_sent/max(abs(cumm_sent)), color = name), size = 1) + 
-        facet_grid(name~.) + theme_bw() + 
-        xlim(range(sentiment_plot$X)) + 
-        ylim(range(sentiment_plot$sentiment)) +
-        ggtitle(paste(sentiment_df$name[i], ":",
-                      paste(word_sentiment_df$word[word_sentiment_df$X == i], sep = "", collapse = " ")))
+   
+```
+
+```{r}
+
+    i <- gif_steps[20]
+
+    ggplot(plot_df , aes(x = X, y = sentiment, fill = name)) + #%>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+    geom_bar(stat = 'identity', alpha = 1.) +
+    geom_line(aes(x=X, y = cumm_sent/max(abs(plot_df$cumm_sent)), color = name), size = 1) +
+    xlim(range(plot_df$X)) +
+    ylim(range(plot_df$sentiment)) +
+    ggtitle(paste0(plot_df$name[i], ": ", gsub("[a-z]+$", "", substr(plot_df$text[i], 1, 80)) ) ) +
+    facet_grid(name~.) +
+    theme_bw()
 
 ```
+

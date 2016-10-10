@@ -58,3 +58,5 @@ mtcars_tibl <- mtcars %>% as_data_frame
     
     ## leaves the pipse intact
     ## a little less work
+    
+    
