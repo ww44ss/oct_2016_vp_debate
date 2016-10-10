@@ -86,79 +86,66 @@ idem <-function(x){x}
     
     cleaned.file <- file.list[grepl("_cleaned", file.list)]
     
-    debate_all <- read.csv(paste0(directory, cleaned.file), stringsAsFactors = FALSE) %>% as_data_frame
+    cleaned_debate_text <- read.csv(paste0(directory, cleaned.file), stringsAsFactors = FALSE) %>% as_data_frame
   
 
-
-    debate_all_s <- debate_all %>% 
-        mutate(text_sentiment = get_sentiment(debate_all$text, method = "afinn"))
-    
-    debate_words  <- debate_all %>%
-        select(X, name, text) %>%
+    ## create tidy df of debate words
+    debate_words <- cleaned_debate_text %>%
         unnest_tokens(word, text) %>%
         filter(!word %in% stop_words$word) %>% 
-        #mutate(word_sentiment = get_sentiment(debate_words$word, method = "afinn")) %>%
         idem
 
+    ## compute sentiment dictionary
     word_sentiment_dict <- sentiments %>%
         filter(lexicon == "AFINN") %>%
         select(word, sentiment = score) %>%
         idem
     
-    sentiment_df <- debate_words %>%
+    ## get sentiment of individual words by joining data with dictionary
+    word_sentiment_df <- debate_words %>%
         left_join(word_sentiment_dict, by = "word") %>%
-        mutate(sent2 = ifelse(is.na(sentiment), 0, sentiment)) %>%
+        mutate(sentiment = ifelse(is.na(sentiment), 0, sentiment)) %>%
+        idem
+    
+    ## compute sentiment of debate responses by regrouping and compute means and cumsums
+    sentiment_df <- word_sentiment_df %>%
         group_by(X, name) %>%
-        summarize(mean_sent = mean(sent2), sum_sent = sum(sent2), abs_sum_sent = sum(abs(sent2))) %>%
+        summarize(sentiment = mean(sentiment)) %>%
+        group_by(name) %>%
+        mutate(cumm_sent = cumsum(sentiment)) %>%
+        #ungroup %>%
         idem
 
+    ## go back and add words for strong sentiment
     
-    sentiment_plot <- data_frame("X" = as.integer(1), "name" = "junk", "sentiment" = 1., "fit" = 1.)[-1,]
-    
-    name.x <- unique(sentiment_df$name)[2]    
-    
-        for (name.x in unique(sentiment_df$name)) {
-            fitted_sent <- sentiment_df %>%
-                filter(name == name.x) %>%
-                idem
-                
-            l.fit <- loess(mean_sent~ X, fitted_sent, span = .15)
-            l.predict <- predict(l.fit, fitted_sent$X)
-            
-            #plot(l.predict)
-            
-            fitted_sent <- fitted_sent %>%
-                select(X, name, mean_sent) %>%
-                bind_cols(as_data_frame(l.predict)) %>%
-                idem
-            
-            colnames(fitted_sent) <- colnames(sentiment_plot)
-            
-            sentiment_plot <- bind_rows(sentiment_plot, fitted_sent)
-        }
-            
-        sentiment_plot <- sentiment_plot[order(sentiment_plot$X),]
+    gif_steps <- c(sentiment_df$X[abs(sentiment_df$sentiment) > .6 ], sentiment_df$X[nrow(sentiment_df)])
 
-        
-    i = 400
-    ggplot(sentiment_plot %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
-        geom_bar(stat = 'identity', alpha = 1.) + 
-        geom_line(aes(x=X, y = 7*fit), color = "blue", size = .4) + 
-        facet_grid(name~.) + theme_bw() + 
-        xlim(range(sentiment_plot$X)) + 
-        ylim(range(sentiment_plot$sentiment)) 
-    
-    
-    
+
     saveGIF({
-    for (i in 1:nrow(sentiment_plot)) {
-        print( ggplot(sentiment_plot %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+    for (i in gif_steps) {
+        print( 
+            ggplot(sentiment_df %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
+                geom_bar(stat = 'identity', alpha = 1.) + 
+                geom_line(aes(x=X, y = 2*cumm_sent/max(abs(cumm_sent)), color = name), size = 1) + 
+                facet_grid(name~.) + theme_bw() +
+                xlim(range(sentiment_plot$X)) + 
+                ylim(range(sentiment_plot$sentiment)) +
+                ggtitle(paste0(sentiment_df$name[i], ": ",
+                      #paste(word_sentiment_df$word[word_sentiment_df$X == i], sep = "", collapse = " "))
+                grep("^([a-z]* )+", substr(cleaned_debate_text$text[i], 1, 40), value=TRUE) ) )
+        )  
+          
+    }
+    }, interval = .5, movie.name = paste0(directory,"sentiment_animation.gif"), ani.width = 800, ani.height = 400)
+    
+    i <- gif_steps[5]
+    ggplot(sentiment_df %>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
         geom_bar(stat = 'identity', alpha = 1.) + 
-        geom_line(aes(x=X, y = 7*fit), color = "blue", size = .4) + 
+        geom_line(aes(x=X, y = 2*cumm_sent/max(abs(cumm_sent)), color = name), size = 1) + 
         facet_grid(name~.) + theme_bw() + 
         xlim(range(sentiment_plot$X)) + 
-        ylim(range(sentiment_plot$sentiment)) ) 
-    }
-    }, interval = 0.1, movie.name = "sentiment_animation.gif", ani.width = 800, ani.height = 400)
+        ylim(range(sentiment_plot$sentiment)) +
+        ggtitle(paste(sentiment_df$name[i], ":",
+                      paste(word_sentiment_df$word[word_sentiment_df$X == i], sep = "", collapse = " ")))
 
 ```
