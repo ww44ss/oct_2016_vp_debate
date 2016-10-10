@@ -1,14 +1,6 @@
----
-title: "SENTIMENT OF OCT 2016 VP DEBATE SPEECH"
-author: "WW44SS"
-date: "Oct 6, 2016"
-output: 
-    html_document:
-        css: markdown7.css
-        toc: true
-        toc_depth: 1
-        keep_md: true
----
+# SENTIMENT OF OCT 2016 VP DEBATE SPEECH
+WW44SS  
+Oct 6, 2016  
 
 
 ###SUMMARY
@@ -19,21 +11,22 @@ The text of the debate are downloaded from the [UCSB Presidency Project](http://
 
 These are lighlyt cleaned (removing punctuation and annotation) by a utility program, catagorized by speaker, and stored as a .csv file which is loaded here for analysis. 
 
-```{r, "idem function", echo=TRUE}
+
+```r
 ## this is an identity helper-function for debug
 idem <-function(x){x}
-
 ```
 
-```{r, "load r libraries", echo=TRUE, warning=FALSE, message=FALSE}
+
+```r
     library(dplyr)
     library(animation)
     library(ggplot2)
     library(tidytext)
 ```
 
-```{r, "find debate files in directory", echo=TRUE, warning=FALSE, message=FALSE}
 
+```r
     ## 
     ## .txt file detection
     
@@ -43,7 +36,8 @@ idem <-function(x){x}
 ```
 
 
-```{r}
+
+```r
     ## search for and read lightly cleaned debate text .csv
     data.file <- file.list[grepl("_cleaned", file.list)]
     debate_text <- read.csv(paste0(directory, data.file), stringsAsFactors = FALSE) %>% as_data_frame
@@ -51,7 +45,8 @@ idem <-function(x){x}
 
 We now begin processing by taking the text, unnesting the sentences, and removing stop words.
 
-```{r}
+
+```r
     ## create tidy df of debate words
     ## add netural non-"stop" word to each
     debate_words <- debate_text %>%
@@ -62,7 +57,8 @@ We now begin processing by taking the text, unnesting the sentences, and removin
 
 WE create a "sentiment dictionary" from the information stored in the `tidytext` package and use a `left_join` to assicate words with the sentiment values.
 
-```{r}
+
+```r
     ## compute sentiment dictionary
     word_sentiment_dict <- sentiments %>%
         filter(lexicon == "AFINN") %>%
@@ -79,7 +75,8 @@ WE create a "sentiment dictionary" from the information stored in the `tidytext`
 
 To look at the trend of the sentiment, I create an exponentially damped cummulative sum function to apply to the data. 
 
-```{r}
+
+```r
     decay_sum <- function(x, decay_rate = 0.1421041) {
         ## EXPONENTIALLY DAMPED CUMMULIATVE SUM
         ## input:   x (a vector of length >1)
@@ -105,7 +102,8 @@ To look at the trend of the sentiment, I create an exponentially damped cummulat
 
 We compute the sum of the sentiment and the cummulative sum.
 
-```{r}
+
+```r
     ## compute sentiment of debate responses by regrouping and compute means and cumsums
     sentiment_df <- word_sentiment_df %>%
         group_by(X, name) %>%
@@ -117,8 +115,8 @@ We compute the sum of the sentiment and the cummulative sum.
 
 The final step is to pull it all together to create a plot data frame. 
 
-```{r}
-    
+
+```r
     ## create data_frame for plotting. Since some X have no entry, need to fix those
     plot_df <- sentiment_df %>% left_join(debate_text, by = c("X", "name")) %>%
         select("X" = X, "name" = name, sentiment, cumm_sent, text) %>%
@@ -127,17 +125,10 @@ The final step is to pull it all together to create a plot data frame.
 ```
 From here I just use the `animation` package functions to create the gif.
 
-```{r, eval = TRUE, echo = FALSE}
 
-    ## go back and add words for strong sentiment
-    
-    gif_steps <- c(plot_df$X[abs(plot_df$sentiment) > 5 ], plot_df$X[nrow(plot_df)])
 
-    gif_steps <- gif_steps[-1]
-```
 
-```{r eval = FALSE}   
-    
+```r
     saveGIF({
     for (i in gif_steps) {
         print( 
@@ -155,17 +146,14 @@ From here I just use the `animation` package functions to create the gif.
           
     }
     }, interval = .5, movie.name = paste0(directory,"sentiment_animation.gif"), ani.width = 800, ani.height = 400)
-    
- 
 ```
 
 ![Gif](/Users/winstonsaunders/Documents/oct_2016_vp_debate/sentiment_animation.gif) 
 
 Here is a single image
 
-```{r}
 
-
+```r
 i <- gif_steps[5]
 
 ggplot(plot_df , aes(x = X, y = sentiment, fill = name)) + #%>% filter(X <= i), aes(x = X, y = sentiment, fill = name)) +
@@ -176,6 +164,11 @@ ggplot(plot_df , aes(x = X, y = sentiment, fill = name)) + #%>% filter(X <= i), 
     ggtitle(paste0(plot_df$name[plot_df$X == i], ": ", gsub("[a-z]+$", "", substr(plot_df$text[plot_df$X == i], 1, 140)) ) ) +
     facet_grid(name~.) +
     theme(plot.title = element_text(size = 12, colour = "darkblue"), legend.position = "bottom")
+```
 
 ```
+## Warning: Stacking not well defined when ymin != 0
+```
+
+![](VP_debate_sentiment_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
 
